@@ -166,16 +166,20 @@ async def get_golink(
     """
     if ctx is None:
         raise PermissionError("Missing request context.")
-    if name is None and gid is None:
+
+    if name is not None:
+        name = name.strip()
+
+    if not name and gid is None:
         raise ValueError("Provide either 'name' or 'gid'.")
-    if name is not None and gid is not None:
+    if name and gid is not None:
         raise ValueError("Provide either 'name' or 'gid', not both.")
 
     authorization = get_authorization_header(ctx)
 
     raw_params: dict = {}
-    if name is not None:
-        raw_params["name"] = name.lower().strip()
+    if name:
+        raw_params["name"] = name.lower()
     else:
         raw_params["gid"] = gid
 
