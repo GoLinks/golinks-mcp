@@ -8,11 +8,11 @@ ENV PYTHONPATH=/app/src
 
 RUN useradd --create-home --shell /usr/sbin/nologin appuser
 
-COPY --chown=appuser:appuser pyproject.toml uv.lock ./
-RUN uv sync --no-dev --frozen
-
+COPY --chown=appuser:appuser pyproject.toml uv.lock README.md ./
 COPY --chown=appuser:appuser src/ src/
+
+RUN uv sync --no-dev --frozen
 
 USER appuser
 
-CMD ["uv", "run", "python", "-m", "golinks_mcp"]
+CMD ["/app/.venv/bin/python", "-m", "golinks_mcp"]
