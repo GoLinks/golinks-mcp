@@ -5,7 +5,7 @@ from fastmcp.tools.function_tool import FunctionTool
 from mcp.types import ToolAnnotations
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.types import ASGIApp
 
 from golinks_mcp.tools.golinks import create_golink, get_golink, list_golinks
@@ -28,6 +28,7 @@ _REVOKE_URL = os.environ.get(
 _MCP_RESOURCE_URL = os.environ.get("MCP_RESOURCE_URL", "https://mcp.golinks.io")
 
 _SCOPES = ["golinks:read", "golinks:write", "search:read"]
+_OPENAI_CHALLENGE_TOKEN =  "P1DPnUpwXo9fibpB43IR6ar4KQFzN3eJTgfdTThNDDU"
 
 mcp = fastmcp.FastMCP("GoLinks")
 
@@ -116,6 +117,11 @@ class RequireBearerOnMCP(BaseHTTPMiddleware):
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok"})
+
+
+@mcp.custom_route("/.well-known/openai-apps-challenge", methods=["GET"])
+async def openai_challenge(request: Request) -> PlainTextResponse:
+    return PlainTextResponse(_OPENAI_CHALLENGE_TOKEN)
 
 
 @mcp.custom_route("/.well-known/oauth-protected-resource", methods=["GET"])
