@@ -4,16 +4,22 @@ import httpx
 from fastmcp import Context
 
 GOLINKS_API_URL = os.environ.get("GOLINKS_API_URL", "https://api.golinks.io")
-GOLINKS_EXTERNAL_REQUEST = os.environ.get("GOLINKS_EXTERNAL_REQUEST", "").lower() == "true"
+GOLINKS_EXTERNAL_REQUEST = (
+    os.environ.get("GOLINKS_EXTERNAL_REQUEST", "").lower() == "true"
+)
 
 http_client = httpx.AsyncClient(
     base_url=GOLINKS_API_URL,
     timeout=30,
 )
 
-def external_params(extra: dict | None = None) -> dict:
-    """Return query params that include externalRequest=true when the flag is set."""
-    params: dict = extra or {}
+REQUEST_SOURCE = "mcp"
+
+
+def external_params(extra: dict | None = None, *, tool: str) -> dict:
+    """Return query params, always tagging the MCP request source & the calling tool,
+    and adding externalRequest=true when the flag is set."""
+    params: dict = {"source": REQUEST_SOURCE, "mcp_tool": tool, **(extra or {})}
     if GOLINKS_EXTERNAL_REQUEST:
         params = {"externalRequest": "true", **params}
     return params
