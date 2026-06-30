@@ -15,6 +15,7 @@ from golinks_mcp.client import (
 # Pydantic models
 # ---------------------------------------------------------------------------
 
+
 class SearchGoLink(BaseModel):
     gid: int = 0
     name: str = ""
@@ -42,9 +43,19 @@ class SearchResponse(BaseModel):
 # Tools
 # ---------------------------------------------------------------------------
 
+
 async def search_golinks(
-    query: Annotated[str, Field(description="Keyword or phrase to search for across go link names, URLs, and descriptions.", min_length=1)],
-    limit: Annotated[int, Field(description="Maximum number of results to return (1–100).", ge=1, le=100)] = 20,
+    query: Annotated[
+        str,
+        Field(
+            description="Keyword or phrase to search for across go link names, URLs, and descriptions.",
+            min_length=1,
+        ),
+    ],
+    limit: Annotated[
+        int,
+        Field(description="Maximum number of results to return (1–100).", ge=1, le=100),
+    ] = 20,
     offset: Annotated[int, Field(description="Pagination offset (0-based).", ge=0)] = 0,
     ctx: Context | None = None,
 ) -> str:
@@ -68,7 +79,7 @@ async def search_golinks(
         "limit": limit,
         "offset": offset,
     }
-    params = external_params(params)
+    params = external_params(params, tool="search_golinks")
 
     try:
         response = await http_client.get(
@@ -96,6 +107,7 @@ async def search_golinks(
     lines = []
     for i, gl in enumerate(data.results, 1):
         entry = f"[{i}] go/{gl.name}"
+        entry += f"\n    GID:  {gl.gid}"
         if gl.url:
             entry += f"\n    URL:  {gl.url}"
         if gl.description:

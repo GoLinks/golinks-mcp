@@ -28,7 +28,7 @@ _REVOKE_URL = os.environ.get(
 _MCP_RESOURCE_URL = os.environ.get("MCP_RESOURCE_URL", "https://mcp.golinks.io")
 
 _SCOPES = ["golinks:read", "golinks:write", "search:read"]
-_OPENAI_CHALLENGE_TOKEN =  "P1DPnUpwXo9fibpB43IR6ar4KQFzN3eJTgfdTThNDDU"
+_OPENAI_CHALLENGE_TOKEN = "P1DPnUpwXo9fibpB43IR6ar4KQFzN3eJTgfdTThNDDU"
 
 mcp = fastmcp.FastMCP("GoLinks")
 

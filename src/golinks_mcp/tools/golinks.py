@@ -16,6 +16,7 @@ from golinks_mcp.client import (
 # Pydantic models
 # ---------------------------------------------------------------------------
 
+
 class GoLinkUser(BaseModel):
     uid: int = 0
     first_name: str = ""
@@ -24,15 +25,18 @@ class GoLinkUser(BaseModel):
     email: str = ""
     user_image_url: str = ""
 
+
 class GoLinkTag(BaseModel):
     tid: int = 0
     name: str = ""
+
 
 class RedirectHits(BaseModel):
     daily: int = 0
     weekly: int = 0
     monthly: int = 0
     alltime: int = 0
+
 
 class GoLink(BaseModel):
     gid: int = 0
@@ -49,30 +53,41 @@ class GoLink(BaseModel):
     created_at: int | None = None
     updated_at: int | None = None
 
+
 class PaginationMetadata(BaseModel):
     limit: int = 0
     offset: int = 0
     total_results: int = 0
     count: int = 0
 
+
 class GoLinksListResponse(BaseModel):
     metadata: PaginationMetadata = PaginationMetadata()
     results: list[GoLink] = []
 
+
 # ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
+
 
 def _format_timestamp(ts: int | None) -> str:
     if ts is None:
         return "Unknown"
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
+
 def _format_golink(gl: GoLink) -> str:
     owner = gl.user
-    owner_str = f"{owner.first_name} {owner.last_name}".strip() or owner.username or owner.email or "Unknown"
+    owner_str = (
+        f"{owner.first_name} {owner.last_name}".strip()
+        or owner.username
+        or owner.email
+        or "Unknown"
+    )
 
     lines = [
+        f"GID:     {gl.gid}",
         f"Name:    go/{gl.name}",
         f"URL:     {gl.url or '(none — multilink)'}",
     ]
@@ -96,22 +111,30 @@ def _format_golink(gl: GoLink) -> str:
 
     if gl.redirect_hits:
         h = gl.redirect_hits
-        lines.append(f"Hits:    daily={h.daily}  weekly={h.weekly}  monthly={h.monthly}  all-time={h.alltime}")
+        lines.append(
+            f"Hits:    daily={h.daily}  weekly={h.weekly}  monthly={h.monthly}  all-time={h.alltime}"
+        )
 
     lines.append(f"Created: {_format_timestamp(gl.created_at)}")
     lines.append(f"Updated: {_format_timestamp(gl.updated_at)}")
     return "\n".join(lines)
 
+
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
 
+
 async def list_golinks(
-    limit: Annotated[int, Field(description="Number of go links to return (1–1000).", ge=1, le=1000)] = 50,
+    limit: Annotated[
+        int, Field(description="Number of go links to return (1–1000).", ge=1, le=1000)
+    ] = 50,
     offset: Annotated[int, Field(description="Pagination offset (0-based).", ge=0)] = 0,
     sort: Annotated[
         str | None,
-        Field(description="Sort order: 'created_at' or 'updated_at'. Defaults to relevance when omitted."),
+        Field(
+            description="Sort order: 'created_at' or 'updated_at'. Defaults to relevance when omitted."
+        ),
     ] = None,
     ctx: Context | None = None,
 ) -> str:
@@ -129,7 +152,7 @@ async def list_golinks(
     params: dict = {"limit": limit, "offset": offset}
     if sort in ("created_at", "updated_at"):
         params["sort"] = sort
-    params = external_params(params)
+    params = external_params(params, tool="list_golinks")
 
     try:
         response = await http_client.get(
@@ -154,9 +177,14 @@ async def list_golinks(
     entries = [f"[{i}]\n{_format_golink(gl)}" for i, gl in enumerate(data.results, 1)]
     return header + "\n\n".join(entries)
 
+
 async def get_golink(
-    name: Annotated[str | None, Field(description="The go link keyword/name (e.g. 'eng-docs').")] = None,
-    gid: Annotated[int | None, Field(description="The numeric go link ID.", ge=1)] = None,
+    name: Annotated[
+        str | None, Field(description="The go link keyword/name (e.g. 'eng-docs').")
+    ] = None,
+    gid: Annotated[
+        int | None, Field(description="The numeric go link ID.", ge=1)
+    ] = None,
     ctx: Context | None = None,
 ) -> str:
     """Get details for a single go link by name (keyword) or numeric ID.
@@ -183,7 +211,7 @@ async def get_golink(
     else:
         raw_params["gid"] = gid
 
-    params = external_params(raw_params)
+    params = external_params(raw_params, tool="get_golink")
 
     try:
         response = await http_client.get(
@@ -206,15 +234,38 @@ async def get_golink(
     gl = GoLink.model_validate(raw)
     return _format_golink(gl)
 
+
 async def create_golink(
-    name: Annotated[str, Field(description="The go link keyword (e.g. 'eng-docs'). Letters, numbers, - and _ only; max 50 chars.", min_length=1)],
+    name: Annotated[
+        str,
+        Field(
+            description="The go link keyword (e.g. 'eng-docs'). Letters, numbers, - and _ only; max 50 chars.",
+            min_length=1,
+        ),
+    ],
     url: Annotated[str, Field(description="Destination URL. Required.", min_length=1)],
-    description: Annotated[str | None, Field(description="Optional description (max 500 chars).")] = None,
-    public: Annotated[bool | None, Field(description="Make the go link public (visible to anyone with the link).")] = None,
-    private: Annotated[bool | None, Field(description="Make the go link private (visible only to the owner).")] = None,
-    unlisted: Annotated[bool | None, Field(description="Make the go link unlisted (not shown in company listings).")] = None,
-    tags: Annotated[list[str] | None, Field(description="List of tag names to apply.")] = None,
-    aliases: Annotated[list[str] | None, Field(description="Alternate names for this go link (max 10).")] = None,
+    description: Annotated[
+        str | None, Field(description="Optional description (max 500 chars).")
+    ] = None,
+    public: Annotated[
+        bool | None,
+        Field(description="Make the go link public (visible to anyone with the link)."),
+    ] = None,
+    private: Annotated[
+        bool | None,
+        Field(description="Make the go link private (visible only to the owner)."),
+    ] = None,
+    unlisted: Annotated[
+        bool | None,
+        Field(description="Make the go link unlisted (not shown in company listings)."),
+    ] = None,
+    tags: Annotated[
+        list[str] | None, Field(description="List of tag names to apply.")
+    ] = None,
+    aliases: Annotated[
+        list[str] | None,
+        Field(description="Alternate names for this go link (max 10)."),
+    ] = None,
     ctx: Context | None = None,
 ) -> str:
     """Create a new, standard go link in the user's GoLinks workspace (https://www.golinks.io).
@@ -251,7 +302,7 @@ async def create_golink(
     if aliases:
         data["aliases[]"] = list(aliases)
 
-    params = external_params()
+    params = external_params(tool="create_golink")
 
     try:
         response = await http_client.post(
