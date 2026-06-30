@@ -107,6 +107,7 @@ async def search_golinks(
     lines = []
     for i, gl in enumerate(data.results, 1):
         entry = f"[{i}] go/{gl.name}"
+        entry += f"\n    GID:  {gl.gid}"
         if gl.url:
             entry += f"\n    URL:  {gl.url}"
         if gl.description:

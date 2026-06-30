@@ -87,6 +87,7 @@ def _format_golink(gl: GoLink) -> str:
     )
 
     lines = [
+        f"GID:     {gl.gid}",
         f"Name:    go/{gl.name}",
         f"URL:     {gl.url or '(none — multilink)'}",
     ]
