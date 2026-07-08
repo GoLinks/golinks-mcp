@@ -25,7 +25,9 @@ def external_params(extra: dict | None = None, *, tool: str) -> dict:
     return params
 
 
-def raise_for_status(response: httpx.Response, api_label: str) -> None:
+def raise_for_status(
+    response: httpx.Response, api_label: str, *, not_found_message: str | None = None
+) -> None:
     """Translate GoLinks API HTTP errors into typed Python exceptions.
 
     Treats 200 and 201 as success; everything else raises.
@@ -39,7 +41,7 @@ def raise_for_status(response: httpx.Response, api_label: str) -> None:
             f"Access denied: insufficient scope or permissions. {response.text[:200]}"
         )
     if response.status_code == 404:
-        raise LookupError("The go link does not exist.")
+        raise LookupError(not_found_message or f"Not found: {api_label}.")
     if response.status_code == 409:
         raise ValueError(f"Conflict: {response.text[:300]}")
     if response.status_code == 422:
@@ -50,6 +52,12 @@ def raise_for_status(response: httpx.Response, api_label: str) -> None:
         f"GoLinks {api_label} API returned status {response.status_code}: "
         f"{response.text[:500]}"
     )
+
+
+def golink_path(name: str, private: int | bool) -> str:
+    """Return the resolvable path for a go link, e.g. 'go/foo' or 'go/my/foo'
+    for private links, which only resolve under the 'go/my/' prefix."""
+    return f"go/my/{name}" if private else f"go/{name}"
 
 
 def get_authorization_header(ctx: Context) -> str:

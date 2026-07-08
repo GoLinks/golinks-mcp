@@ -32,7 +32,7 @@ The MCP server forwards that header to `api.golinks.io`. GoLinks remains respons
 
 An OAuth client must be pre-registered in your GoLinks workspace with:
 
-- Allowed scopes: `golinks:read`, `golinks:write`, `search:read`
+- Allowed scopes: `golinks:read`, `golinks:write`, `search:read`, `admin:read`, `users:read`
 - Redirect URIs: the exact callback URL(s) your MCP client uses
 
 To do so, visit the [OAuth Apps](https://app.golinks.io/developer-tools.php#/oauth-apps) page under Developer Tools, on the GoLinks dashboard
@@ -83,5 +83,8 @@ docker run --rm -p 8000:8000 golinks-mcp
 | ---------------- | ------------------------------------------ | --------------- |
 | `list_golinks`   | List all company go links (paginated)      | `golinks:read`  |
 | `get_golink`     | Get a single go link by name or numeric ID | `golinks:read`  |
-| `search_golinks` | Fuzzy keyword search across go links       | `search:read`   |
+| `search_golinks` | Fuzzy keyword search across go links, with filters (ownership, tags, collections, recency, etc.) | `search:read`   |
 | `create_golink`  | Create a new go link (standard only)       | `golinks:write` |
+| `search_collections` | Search/list collections; resolves a collection name to its numeric ID for use with `search_golinks` | `search:read` |
+| `search_users`   | Search/list workspace users; resolves a name/username/email to a numeric uid for use with `get_audit_logs` | `users:read` |
+| `get_audit_logs` | List/filter workspace audit log entries (admin only) | `admin:read`    |
