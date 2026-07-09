@@ -97,7 +97,7 @@ def _format_user(u: GoLinksUserResult) -> str:
 async def search_users(
     search: Annotated[
         str | None,
-        Field(description="Search term matched against username, email, or name."),
+        Field(description="Search term matched against first name, last name, full name, or email (substring match)."),
     ] = None,
     access_level: Annotated[
         list[UserAccessLevel] | None,
