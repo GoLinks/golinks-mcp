@@ -86,12 +86,14 @@ class SearchResponse(BaseModel):
 
 async def search_golinks(
     query: Annotated[
-        str,
+        str | None,
         Field(
-            description="Keyword or phrase to search for across go link names, URLs, and descriptions.",
-            min_length=1,
+            description=(
+                "Keyword or phrase to search for across go link names, URLs, and "
+                "descriptions. Omit to browse/list all go links matching the given filters."
+            )
         ),
-    ],
+    ] = None,
     limit: Annotated[
         int,
         Field(description="Maximum number of results to return (1–100).", ge=1, le=100),
@@ -171,9 +173,12 @@ async def search_golinks(
     across go link names, URLs, and descriptions, with optional filters
     for ownership/visibility, tags, collections, and recency.
 
-    Use this when you want to find go links matching a search term.
-    For listing all go links or fetching a specific one by exact name/ID,
-    use list_golinks or get_golink instead. Read-only.
+    'query' is optional — omit it to browse/list all go links matching
+    the given filters (e.g. all of a user's links, or all links in a
+    collection) without keyword matching.
+
+    For fetching a specific go link by exact name/ID, use get_golink
+    instead. Read-only.
 
     Requires search:read scope.
     """
@@ -184,7 +189,7 @@ async def search_golinks(
     authorization = get_authorization_header(ctx)
 
     params: dict = {
-        "search-term": query,
+        "search-term": query or "",
         "result-type": "links",
         "limit": limit,
         "offset": offset,
@@ -223,11 +228,13 @@ async def search_golinks(
     data = SearchResponse.model_validate(response.json())
 
     if not data.results:
-        return f'No go links found for "{query}".'
+        return f'No go links found for "{query}".' if query else "No go links found."
 
     header = (
         f'Go link search results for "{data.search_term or query}" '
         f"({len(data.results)} shown of {data.total_links} total):\n"
+        if query
+        else f"Go links ({len(data.results)} shown of {data.total_links} total):\n"
     )
 
     lines = []
