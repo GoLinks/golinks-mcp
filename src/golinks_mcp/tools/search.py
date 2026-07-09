@@ -5,6 +5,7 @@ from fastmcp import Context
 from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
+    SortOrder,
     external_params,
     get_authorization_header,
     golink_path,
@@ -46,7 +47,6 @@ SearchSort = Literal[
     "name",
 ]
 
-SearchOrder = Literal["asc", "desc"]
 
 SearchModified = Literal["today", "last_7_days", "last_30_days", "last_90_days", "last_year"]
 
@@ -110,7 +110,7 @@ async def search_golinks(
         ),
     ] = None,
     order: Annotated[
-        SearchOrder | None, Field(description="Sort direction: 'asc' or 'desc'.")
+        SortOrder | None, Field(description="Sort direction: 'asc' or 'desc'.")
     ] = None,
     filter: Annotated[
         list[SearchFilter] | None,

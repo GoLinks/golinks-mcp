@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 import httpx
@@ -6,12 +5,13 @@ from fastmcp import Context
 from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
+    SortOrder,
     external_params,
+    format_timestamp,
     get_authorization_header,
     http_client,
     raise_for_status,
 )
-from golinks_mcp.tools.search import SearchOrder
 
 # ---------------------------------------------------------------------------
 # Filter/sort/department literals
@@ -78,12 +78,6 @@ class CollectionsSearchResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _format_timestamp(ts: int | None) -> str:
-    if ts is None:
-        return "Unknown"
-    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-
-
 def _format_collection(c: Collection) -> str:
     lines = [
         f"Collid:  {c.collid}",
@@ -106,8 +100,8 @@ def _format_collection(c: Collection) -> str:
     if flags:
         lines.append(f"Flags:   {', '.join(flags)}")
 
-    lines.append(f"Created: {_format_timestamp(c.created_at)}")
-    lines.append(f"Updated: {_format_timestamp(c.updated_at)}")
+    lines.append(f"Created: {format_timestamp(c.created_at)}")
+    lines.append(f"Updated: {format_timestamp(c.updated_at)}")
     return "\n".join(lines)
 
 
@@ -140,7 +134,7 @@ async def search_collections(
         ),
     ] = None,
     order: Annotated[
-        SearchOrder | None, Field(description="Sort direction: 'asc' or 'desc'.")
+        SortOrder | None, Field(description="Sort direction: 'asc' or 'desc'.")
     ] = None,
     department: Annotated[
         CollectionDepartment | None,

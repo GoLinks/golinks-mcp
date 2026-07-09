@@ -1,7 +1,12 @@
 import os
+from datetime import datetime, timezone
+from typing import Literal
 
 import httpx
 from fastmcp import Context
+
+# Sort direction shared across all list/search endpoints
+SortOrder = Literal["asc", "desc"]
 
 GOLINKS_API_URL = os.environ.get("GOLINKS_API_URL", "https://api.golinks.io")
 GOLINKS_EXTERNAL_REQUEST = (
@@ -58,6 +63,13 @@ def golink_path(name: str, private: int | bool) -> str:
     """Return the resolvable path for a go link, e.g. 'go/foo' or 'go/my/foo'
     for private links, which only resolve under the 'go/my/' prefix."""
     return f"go/my/{name}" if private else f"go/{name}"
+
+
+def format_timestamp(ts: int | None) -> str:
+    """Format a Unix timestamp (seconds) as 'YYYY-MM-DD HH:MM UTC'."""
+    if ts is None:
+        return "Unknown"
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def get_authorization_header(ctx: Context) -> str:

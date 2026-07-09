@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Annotated
 
 import httpx
@@ -7,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
     external_params,
+    format_timestamp,
     get_authorization_header,
     golink_path,
     http_client,
@@ -72,12 +72,6 @@ class GoLinksListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _format_timestamp(ts: int | None) -> str:
-    if ts is None:
-        return "Unknown"
-    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-
-
 def _format_golink(gl: GoLink) -> str:
     owner = gl.user
     owner_str = (
@@ -116,8 +110,8 @@ def _format_golink(gl: GoLink) -> str:
             f"Hits:    daily={h.daily}  weekly={h.weekly}  monthly={h.monthly}  all-time={h.alltime}"
         )
 
-    lines.append(f"Created: {_format_timestamp(gl.created_at)}")
-    lines.append(f"Updated: {_format_timestamp(gl.updated_at)}")
+    lines.append(f"Created: {format_timestamp(gl.created_at)}")
+    lines.append(f"Updated: {format_timestamp(gl.updated_at)}")
     return "\n".join(lines)
 
 

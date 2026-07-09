@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 import httpx
@@ -6,7 +5,9 @@ from fastmcp import Context
 from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
+    SortOrder,
     external_params,
+    format_timestamp,
     get_authorization_header,
     http_client,
     raise_for_status,
@@ -21,8 +22,6 @@ UserAccessLevel = Literal["admin", "member", "moderator", "limited_member"]
 UserStatus = Literal["active", "inactive"]
 
 UserSort = Literal["name", "created_at", "updated_at"]
-
-UserOrder = Literal["asc", "desc"]
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -60,12 +59,6 @@ class UsersListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _format_timestamp(ts: int | None) -> str:
-    if ts is None:
-        return "Unknown"
-    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-
-
 def _format_user(u: GoLinksUserResult) -> str:
     name = f"{u.first_name} {u.last_name}".strip() or u.username or u.email or "Unknown"
 
@@ -85,7 +78,7 @@ def _format_user(u: GoLinksUserResult) -> str:
         lines.append(f"Flags:    {', '.join(flags)}")
 
     lines.append(f"Links:    {u.total_nonprivate_links} non-private go links")
-    lines.append(f"Created:  {_format_timestamp(u.created_at)}")
+    lines.append(f"Created:  {format_timestamp(u.created_at)}")
     return "\n".join(lines)
 
 
@@ -121,7 +114,7 @@ async def search_users(
         Field(description="Sort order: 'name', 'created_at', or 'updated_at'."),
     ] = None,
     order: Annotated[
-        UserOrder | None, Field(description="Sort direction: 'asc' or 'desc'.")
+        SortOrder | None, Field(description="Sort direction: 'asc' or 'desc'.")
     ] = None,
     ctx: Context | None = None,
 ) -> str:

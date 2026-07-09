@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 import httpx
@@ -7,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
     external_params,
+    format_timestamp,
     get_authorization_header,
     http_client,
     raise_for_status,
@@ -109,12 +109,6 @@ class AuditLogListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _format_timestamp(ts: int | None) -> str:
-    if ts is None:
-        return "Unknown"
-    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-
-
 def _format_entry(entry: AuditLogEntry) -> str:
     lines = [
         f"ALID:    {entry.alid}",
@@ -125,7 +119,7 @@ def _format_entry(entry: AuditLogEntry) -> str:
     ]
     if entry.message:
         lines.append(f"Message: {entry.message}")
-    lines.append(f"When:    {_format_timestamp(entry.created_at)}")
+    lines.append(f"When:    {format_timestamp(entry.created_at)}")
     return "\n".join(lines)
 
 
