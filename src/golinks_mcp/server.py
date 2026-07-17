@@ -8,8 +8,11 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.types import ASGIApp
 
+from golinks_mcp.tools.audit_log import get_audit_logs
+from golinks_mcp.tools.collections import search_collections
 from golinks_mcp.tools.golinks import create_golink, get_golink, list_golinks
 from golinks_mcp.tools.search import search_golinks
+from golinks_mcp.tools.users import search_users
 
 # OAuth discovery env vars with production defaults
 _ISSUER = os.environ.get("GOLINKS_OAUTH_ISSUER", "https://www.golinks.io")
@@ -27,7 +30,7 @@ _REVOKE_URL = os.environ.get(
 )
 _MCP_RESOURCE_URL = os.environ.get("MCP_RESOURCE_URL", "https://mcp.golinks.io")
 
-_SCOPES = ["golinks:read", "golinks:write", "search:read"]
+_SCOPES = ["golinks:read", "golinks:write", "search:read", "admin:read", "users:read"]
 _OPENAI_CHALLENGE_TOKEN = "P1DPnUpwXo9fibpB43IR6ar4KQFzN3eJTgfdTThNDDU"
 
 mcp = fastmcp.FastMCP("GoLinks")
@@ -80,6 +83,45 @@ mcp.add_tool(
             readOnlyHint=False,
             destructiveHint=False,
             idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
+)
+mcp.add_tool(
+    FunctionTool.from_function(
+        get_audit_logs,
+        title="Get audit logs",
+        annotations=ToolAnnotations(
+            title="Get audit logs",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
+)
+mcp.add_tool(
+    FunctionTool.from_function(
+        search_collections,
+        title="Search collections",
+        annotations=ToolAnnotations(
+            title="Search collections",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
+)
+mcp.add_tool(
+    FunctionTool.from_function(
+        search_users,
+        title="Search users",
+        annotations=ToolAnnotations(
+            title="Search users",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
             openWorldHint=False,
         ),
     )

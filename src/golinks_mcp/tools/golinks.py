@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Annotated
 
 import httpx
@@ -7,7 +6,9 @@ from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
     external_params,
+    format_timestamp,
     get_authorization_header,
+    golink_path,
     http_client,
     raise_for_status,
 )
@@ -71,12 +72,6 @@ class GoLinksListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _format_timestamp(ts: int | None) -> str:
-    if ts is None:
-        return "Unknown"
-    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-
-
 def _format_golink(gl: GoLink) -> str:
     owner = gl.user
     owner_str = (
@@ -88,7 +83,7 @@ def _format_golink(gl: GoLink) -> str:
 
     lines = [
         f"GID:     {gl.gid}",
-        f"Name:    go/{gl.name}",
+        f"Name:    {golink_path(gl.name, gl.private)}",
         f"URL:     {gl.url or '(none — multilink)'}",
     ]
     if gl.description:
@@ -115,8 +110,8 @@ def _format_golink(gl: GoLink) -> str:
             f"Hits:    daily={h.daily}  weekly={h.weekly}  monthly={h.monthly}  all-time={h.alltime}"
         )
 
-    lines.append(f"Created: {_format_timestamp(gl.created_at)}")
-    lines.append(f"Updated: {_format_timestamp(gl.updated_at)}")
+    lines.append(f"Created: {format_timestamp(gl.created_at)}")
+    lines.append(f"Updated: {format_timestamp(gl.updated_at)}")
     return "\n".join(lines)
 
 
@@ -165,7 +160,7 @@ async def list_golinks(
     except httpx.ConnectError:
         raise ConnectionError("Failed to connect to GoLinks API.")
 
-    raise_for_status(response, "/golinks")
+    raise_for_status(response, "/golinks", not_found_message="The go link does not exist.")
 
     data = GoLinksListResponse.model_validate(response.json())
 
@@ -224,7 +219,7 @@ async def get_golink(
     except httpx.ConnectError:
         raise ConnectionError("Failed to connect to GoLinks API.")
 
-    raise_for_status(response, "/golinks")
+    raise_for_status(response, "/golinks", not_found_message="The go link does not exist.")
 
     # Single-lookup always returns a dict on success
     raw = response.json()
@@ -249,15 +244,35 @@ async def create_golink(
     ] = None,
     public: Annotated[
         bool | None,
-        Field(description="Make the go link public (visible to anyone with the link)."),
+        Field(
+            description=(
+                "Make the go link public (visible to anyone with the link). If "
+                "'public', 'private', and 'unlisted' are all omitted/false, the go "
+                "link defaults to company visibility (visible to everyone in the workspace)."
+            )
+        ),
     ] = None,
     private: Annotated[
         bool | None,
-        Field(description="Make the go link private (visible only to the owner)."),
+        Field(
+            description=(
+                "Make the go link private (visible only to the owner). Private go "
+                "links resolve at 'go/my/<name>', not 'go/<name>'. If 'public', "
+                "'private', and 'unlisted' are all omitted/false, the go link defaults "
+                "to company visibility (visible to everyone in the workspace)."
+            )
+        ),
     ] = None,
     unlisted: Annotated[
         bool | None,
-        Field(description="Make the go link unlisted (not shown in company listings)."),
+        Field(
+            description=(
+                "Make the go link unlisted (not shown in company listings, but still "
+                "resolvable/accessible company-wide). If 'public', 'private', and "
+                "'unlisted' are all omitted/false, the go link defaults to company "
+                "visibility (visible to everyone in the workspace)."
+            )
+        ),
     ] = None,
     tags: Annotated[
         list[str] | None, Field(description="List of tag names to apply.")
@@ -276,6 +291,9 @@ async def create_golink(
     descriptive messages.
 
     Only standard go links can be created through this tool.
+
+    Visibility defaults to 'company' (visible to everyone in the workspace)
+    if 'public', 'private', and 'unlisted' are all left unset.
 
     Requires golinks:write scope.
     """
