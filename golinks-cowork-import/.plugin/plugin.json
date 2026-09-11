@@ -1,0 +1,10 @@
+{
+  "name": "golinks",
+  "version": "1.0.0",
+  "description": "Access resources instantly",
+  "author": {
+    "name": "GoLinks",
+    "url": "https://www.golinks.io/"
+  },
+  "homepage": "https://www.golinks.io/"
+}

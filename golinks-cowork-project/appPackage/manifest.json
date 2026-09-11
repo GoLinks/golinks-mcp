@@ -1,0 +1,41 @@
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/teams/vDevPreview/MicrosoftTeams.schema.json",
+    "manifestVersion": "devPreview",
+    "version": "1.0.0",
+    "id": "4cab4a05-ba52-56dc-9511-b7a8104741cc",
+    "developer": {
+        "name": "GoLinks",
+        "websiteUrl": "https://www.golinks.io/",
+        "privacyUrl": "https://www.golinks.io/privacy.php",
+        "termsOfUseUrl": "https://www.golinks.io/terms.php"
+    },
+    "name": {
+        "short": "Golinks",
+        "full": "Golinks"
+    },
+    "description": {
+        "short": "Access resources instantly",
+        "full": "GoLinks helps teams find, access, and share workplace knowledge faster by turning long URLs into secure, human-readable go links.\n\nWith the GoLinks app for Microsoft Copilot, employees can search their company’s GoLinks library, find important resources, and get details about go links without leaving Microsoft Copilot. Ask Microsoft Copilot to look up a go link, search by keyword, summarize what a link is for, review ownership and usage details, or create a new go link for quick access to a resource.\n\nGoLinks makes it easier for teams to navigate the apps, documents, dashboards, and information they use every day. Instead of remembering long URLs or searching through multiple tools, employees can simply ask Microsoft Copilot for the go link they need.\n\nGo links created by your organization are only accessible based on your workspace permissions, helping keep company resources secure while making knowledge easier to discover.\n\nUse GoLinks in Microsoft Copilot to reduce context switching, improve productivity, and give your team a faster way to access trusted workplace resources."
+    },
+    "icons": {
+        "color": "color.png",
+        "outline": "outline.png"
+    },
+    "accentColor": "#4A90D9",
+    "agentConnectors": [
+        {
+            "id": "golinks",
+            "displayName": "golinks MCP Server",
+            "description": "Remote MCP server providing tools for golinks",
+            "toolSource": {
+                "remoteMcpServer": {
+                    "mcpServerUrl": "https://mcp.golinks.io/mcp",
+                    "authorization": {
+                        "type": "OAuthPluginVault",
+                        "referenceId": "OWY2YmYyYTctYjQyNi00MzdlLTkzNTUtZGJhNjQyOGVmMWEyIyNmNWIxNDIxNy05MzZiLTQ3MjQtYmM1NC1hNDlhYmUwMmU2Mzg="
+                    }
+                }
+            }
+        }
+    ]
+}

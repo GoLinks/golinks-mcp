@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "golinks": {
+      "type": "http",
+      "url": "https://mcp.golinks.io/mcp"
+    }
+  }
+}
