@@ -1,12 +1,16 @@
 import os
 from datetime import datetime, timezone
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastmcp import Context
 
 # Sort direction shared across all list/search endpoints
 SortOrder = Literal["asc", "desc"]
+
+# Timezone the GoLinks backend uses for raw datetime strings
+API_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 GOLINKS_API_URL = os.environ.get("GOLINKS_API_URL", "https://api.golinks.io")
 GOLINKS_EXTERNAL_REQUEST = (
@@ -70,6 +74,20 @@ def format_timestamp(ts: int | None) -> str:
     if ts is None:
         return "Unknown"
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def parse_api_datetime(value: str | int | None) -> int | None:
+    """Convert a GoLinks 'YYYY-MM-DD HH:MM:SS' datetime to a Unix timestamp.
+
+    Some endpoints (e.g. /search.php) return raw DB datetimes with no zone.
+    The backend runs in America/Los_Angeles, so they're interpreted as such.
+    Integers are assumed to already be Unix timestamps and are passed through."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, int):
+        return value
+    local = datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=API_TIMEZONE)
+    return int(local.timestamp())
 
 
 def iso_timestamp(ts: int | None) -> str | None:

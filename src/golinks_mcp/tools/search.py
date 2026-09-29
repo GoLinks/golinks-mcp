@@ -3,15 +3,24 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import Context
 from fastmcp.tools import ToolResult
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from golinks_mcp.client import (
     SortOrder,
     external_params,
+    format_timestamp,
     get_authorization_header,
     golink_path,
     http_client,
+    iso_timestamp,
+    parse_api_datetime,
     raise_for_status,
+)
+from golinks_mcp.tools.golinks import (
+    GoLinkOwnerOutput,
+    GoLinkUser,
+    RedirectHits,
+    owner_name,
 )
 
 # ---------------------------------------------------------------------------
@@ -62,6 +71,35 @@ class SearchGoLink(BaseModel):
     url: str | None = None
     description: str | None = None
     private: int = 0
+    unlisted: int = 0
+    variable_link: int = 0
+    pinned: int = 0
+    uid: int = 0
+    firstname: str | None = None
+    lastname: str | None = None
+    username: str | None = None
+    email: str | None = None
+    daily: int = 0
+    weekly: int = 0
+    monthly: int = 0
+    alltime: int = 0
+    created_at: int | None = None
+    updated_at: int | None = None
+
+    # /search.php returns raw backend-local datetimes
+    _parse_datetimes = field_validator("created_at", "updated_at", mode="before")(
+        parse_api_datetime
+    )
+
+    @property
+    def user(self) -> GoLinkUser:
+        return GoLinkUser(
+            uid=self.uid,
+            first_name=self.firstname or "",
+            last_name=self.lastname or "",
+            username=self.username or "",
+            email=self.email or "",
+        )
 
 
 class SearchPaginationMetadata(BaseModel):
@@ -91,7 +129,14 @@ class SearchGoLinkOutput(BaseModel):
     path: str = Field(description="Resolvable path, e.g. 'go/foo' or 'go/my/foo' for private links.")
     url: str | None = Field(description="Destination URL; null for multilinks.")
     description: str | None = None
+    owner: GoLinkOwnerOutput
     private: bool
+    unlisted: bool
+    variable_link: bool
+    pinned: bool = Field(description="Pinned links are always listed first, regardless of sort.")
+    redirect_hits: RedirectHits
+    created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
+    updated_at: str | None = Field(description="ISO 8601 UTC timestamp.")
 
 
 class SearchGoLinksOutput(BaseModel):
@@ -107,7 +152,20 @@ def _to_output(gl: SearchGoLink) -> SearchGoLinkOutput:
         path=golink_path(gl.name, gl.private),
         url=gl.url,
         description=gl.description or None,
+        owner=GoLinkOwnerOutput(
+            uid=gl.uid,
+            name=owner_name(gl.user),
+            email=gl.email or None,
+        ),
         private=bool(gl.private),
+        unlisted=bool(gl.unlisted),
+        variable_link=bool(gl.variable_link),
+        pinned=bool(gl.pinned),
+        redirect_hits=RedirectHits(
+            daily=gl.daily, weekly=gl.weekly, monthly=gl.monthly, alltime=gl.alltime
+        ),
+        created_at=iso_timestamp(gl.created_at),
+        updated_at=iso_timestamp(gl.updated_at),
     )
 
 
@@ -210,7 +268,14 @@ async def search_golinks(
     collection) without keyword matching.
 
     For fetching a specific go link by exact name/ID, use get_golink
-    instead. Read-only.
+    instead.
+
+    Unlike list_golinks, results include the caller's own private and
+    unlisted links. Pinned go links are always listed first, regardless of
+    'sort'. For "most recent" questions, rank by each link's
+    'updated_at'/'created_at' rather than by result order.
+
+    Read-only.
 
     Requires search:read scope.
     """
@@ -285,11 +350,16 @@ async def search_golinks(
     lines = []
     for i, gl in enumerate(data.results, 1):
         entry = f"[{i}] {golink_path(gl.name, gl.private)}"
-        entry += f"\n    GID:  {gl.gid}"
+        entry += f"\n    GID:     {gl.gid}"
         if gl.url:
-            entry += f"\n    URL:  {gl.url}"
+            entry += f"\n    URL:     {gl.url}"
         if gl.description:
-            entry += f"\n    Desc: {gl.description}"
+            entry += f"\n    Desc:    {gl.description}"
+        entry += f"\n    Owner:   {owner_name(gl.user)}"
+        if gl.pinned:
+            entry += "\n    Pinned:  yes"
+        entry += f"\n    Hits:    {gl.alltime} all-time"
+        entry += f"\n    Updated: {format_timestamp(gl.updated_at)}"
         lines.append(entry)
 
     return ToolResult(content=header + "\n\n".join(lines), structured_content=structured)

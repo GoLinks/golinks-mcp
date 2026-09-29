@@ -102,7 +102,7 @@ class GoLinksListOutput(BaseModel):
     results: list[GoLinkOutput]
 
 
-def _owner_name(owner: GoLinkUser) -> str:
+def owner_name(owner: GoLinkUser) -> str:
     return (
         f"{owner.first_name} {owner.last_name}".strip()
         or owner.username
@@ -120,7 +120,7 @@ def _to_output(gl: GoLink) -> GoLinkOutput:
         description=gl.description or None,
         owner=GoLinkOwnerOutput(
             uid=gl.user.uid,
-            name=_owner_name(gl.user),
+            name=owner_name(gl.user),
             email=gl.user.email or None,
         ),
         tags=[t.name for t in gl.tags],
@@ -147,7 +147,7 @@ def _format_golink(gl: GoLink) -> str:
     ]
     if gl.description:
         lines.append(f"Desc:    {gl.description}")
-    lines.append(f"Owner:   {_owner_name(gl.user)}")
+    lines.append(f"Owner:   {owner_name(gl.user)}")
     if gl.tags:
         lines.append(f"Tags:    {', '.join(t.name for t in gl.tags)}")
 
@@ -197,6 +197,11 @@ async def list_golinks(
     Returns a paginated list of company go links the token has access to.
     External OAuth tokens do not include private or unlisted links unless
     specifically granted. Use search_golinks for keyword-based lookup.
+
+    Pinned go links are always listed first, regardless of 'sort'. For
+    "most recent" questions, rank by each link's 'updated_at'/'created_at'
+    rather than by result order.
+
     Read-only.
     """
     if ctx is None:
