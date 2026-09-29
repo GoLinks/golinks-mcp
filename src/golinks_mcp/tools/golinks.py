@@ -183,8 +183,13 @@ def _format_golink(gl: GoLink) -> str:
 
 async def list_golinks(
     limit: Annotated[
-        int, Field(description="Number of go links to return (1–1000).", ge=1, le=1000)
-    ] = 50,
+        int,
+        Field(
+            description="Number of go links to return (1–100). Use 'offset' to page through more.",
+            ge=1,
+            le=100,
+        ),
+    ] = 20,
     offset: Annotated[int, Field(description="Pagination offset (0-based).", ge=0)] = 0,
     sort: Annotated[
         str | None,
