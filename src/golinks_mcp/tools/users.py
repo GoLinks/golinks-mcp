@@ -2,6 +2,7 @@ from typing import Annotated, Literal
 
 import httpx
 from fastmcp import Context
+from fastmcp.tools import ToolResult
 from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
@@ -10,6 +11,7 @@ from golinks_mcp.client import (
     format_timestamp,
     get_authorization_header,
     http_client,
+    iso_timestamp,
     raise_for_status,
 )
 
@@ -55,16 +57,54 @@ class UsersListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Tool output models
+# ---------------------------------------------------------------------------
+
+
+class UserOutput(BaseModel):
+    uid: int = Field(description="Numeric user ID; pass as 'filter_uid' to get_audit_logs.")
+    name: str = Field(description="Display name, falling back to username or email.")
+    username: str | None = Field(description="Exact username; pass as 'username' to search_golinks.")
+    email: str | None = None
+    role: str | None = None
+    admin: bool
+    active: bool | None = Field(description="Whether the user is active; null if unknown.")
+    total_nonprivate_links: int
+    created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
+
+
+class UsersListOutput(BaseModel):
+    metadata: UsersPaginationMetadata
+    results: list[UserOutput]
+
+
+def _display_name(u: GoLinksUserResult) -> str:
+    return f"{u.first_name} {u.last_name}".strip() or u.username or u.email or "Unknown"
+
+
+def _to_output(u: GoLinksUserResult) -> UserOutput:
+    return UserOutput(
+        uid=u.uid,
+        name=_display_name(u),
+        username=u.username or None,
+        email=u.email or None,
+        role=u.role or None,
+        admin=bool(u.admin),
+        active=None if u.active is None else bool(u.active),
+        total_nonprivate_links=u.total_nonprivate_links,
+        created_at=iso_timestamp(u.created_at),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
 
 
 def _format_user(u: GoLinksUserResult) -> str:
-    name = f"{u.first_name} {u.last_name}".strip() or u.username or u.email or "Unknown"
-
     lines = [
         f"UID:      {u.uid}",
-        f"Name:     {name}",
+        f"Name:     {_display_name(u)}",
         f"Username: {u.username or 'Unknown'}",
         f"Email:    {u.email or 'Unknown'}",
     ]
@@ -117,7 +157,7 @@ async def search_users(
         SortOrder | None, Field(description="Sort direction: 'asc' or 'desc'.")
     ] = None,
     ctx: Context | None = None,
-) -> str:
+) -> ToolResult:
     """Search for or list users in the user's GoLinks workspace
     (https://www.golinks.io). Returns each user's numeric 'uid', name,
     username, email, and access level.
@@ -159,11 +199,15 @@ async def search_users(
     raise_for_status(response, "/users")
 
     data = UsersListResponse.model_validate(response.json())
+    structured = UsersListOutput(
+        metadata=data.metadata,
+        results=[_to_output(u) for u in data.results],
+    )
 
     if not data.results:
-        return "No users found."
+        return ToolResult(content="No users found.", structured_content=structured)
 
     m = data.metadata
     header = f"Users ({m.count} of {m.total_results} total, offset {m.offset}):\n"
     entries = [f"[{i}]\n{_format_user(u)}" for i, u in enumerate(data.results, 1)]
-    return header + "\n\n".join(entries)
+    return ToolResult(content=header + "\n\n".join(entries), structured_content=structured)

@@ -72,6 +72,13 @@ def format_timestamp(ts: int | None) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
+def iso_timestamp(ts: int | None) -> str | None:
+    """Format a Unix timestamp (seconds) as ISO 8601 UTC, for structured output."""
+    if ts is None:
+        return None
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
 def get_authorization_header(ctx: Context) -> str:
     """Return the incoming request Authorization header for forwarding to GoLinks APIs."""
     if ctx.request_context is None or ctx.request_context.request is None:

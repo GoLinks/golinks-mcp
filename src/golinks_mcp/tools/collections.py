@@ -2,6 +2,7 @@ from typing import Annotated, Literal
 
 import httpx
 from fastmcp import Context
+from fastmcp.tools import ToolResult
 from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
@@ -10,6 +11,7 @@ from golinks_mcp.client import (
     format_timestamp,
     get_authorization_header,
     http_client,
+    iso_timestamp,
     raise_for_status,
 )
 
@@ -71,6 +73,48 @@ class CollectionsPaginationMetadata(BaseModel):
 class CollectionsSearchResponse(BaseModel):
     collections: list[Collection] = []
     metadata: CollectionsPaginationMetadata = CollectionsPaginationMetadata()
+
+
+# ---------------------------------------------------------------------------
+# Tool output models
+# ---------------------------------------------------------------------------
+
+
+class CollectionOutput(BaseModel):
+    collid: int = Field(description="Numeric collection ID; pass as 'collid' to search_golinks.")
+    name: str
+    description: str | None = None
+    owner_uid: int = Field(description="Numeric ID of the collection's owner.")
+    golinks_count: int = Field(description="Number of go links in the collection.")
+    golinks_app_count: int = Field(description="Number of app go links in the collection.")
+    golinks_app_domains: list[str] = []
+    pinned: bool
+    unlisted: bool
+    favorited: bool = Field(description="Whether the caller has favorited this collection.")
+    created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
+    updated_at: str | None = Field(description="ISO 8601 UTC timestamp.")
+
+
+class CollectionsListOutput(BaseModel):
+    metadata: CollectionsPaginationMetadata
+    results: list[CollectionOutput]
+
+
+def _to_output(c: Collection) -> CollectionOutput:
+    return CollectionOutput(
+        collid=c.collid,
+        name=c.name,
+        description=c.description or None,
+        owner_uid=c.uid,
+        golinks_count=c.golinks_count,
+        golinks_app_count=c.golinks_app_count,
+        golinks_app_domains=c.golinks_app_domains,
+        pinned=bool(c.pinned),
+        unlisted=bool(c.unlisted),
+        favorited=bool(c.is_favorited),
+        created_at=iso_timestamp(c.created_at),
+        updated_at=iso_timestamp(c.updated_at),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +194,7 @@ async def search_collections(
         ),
     ] = None,
     ctx: Context | None = None,
-) -> str:
+) -> ToolResult:
     """Search for or list collections of go links in the user's GoLinks
     workspace (https://www.golinks.io). Returns the collection's numeric
     'collid', name, description, and link counts.
@@ -194,11 +238,15 @@ async def search_collections(
     raise_for_status(response, "/search.php")
 
     data = CollectionsSearchResponse.model_validate(response.json())
+    structured = CollectionsListOutput(
+        metadata=data.metadata,
+        results=[_to_output(c) for c in data.collections],
+    )
 
     if not data.collections:
-        return "No collections found."
+        return ToolResult(content="No collections found.", structured_content=structured)
 
     m = data.metadata
     header = f"Collections ({m.count} of {m.total_results} total, offset {m.offset}):\n"
     entries = [f"[{i}]\n{_format_collection(c)}" for i, c in enumerate(data.collections, 1)]
-    return header + "\n\n".join(entries)
+    return ToolResult(content=header + "\n\n".join(entries), structured_content=structured)

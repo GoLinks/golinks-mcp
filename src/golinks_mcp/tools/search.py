@@ -2,6 +2,7 @@ from typing import Annotated, Literal
 
 import httpx
 from fastmcp import Context
+from fastmcp.tools import ToolResult
 from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
@@ -77,6 +78,37 @@ class SearchResponse(BaseModel):
     metadata: SearchPaginationMetadata = SearchPaginationMetadata()
 
     model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Tool output models
+# ---------------------------------------------------------------------------
+
+
+class SearchGoLinkOutput(BaseModel):
+    gid: int = Field(description="Numeric go link ID; pass to get_golink for full details.")
+    name: str = Field(description="Go link keyword.")
+    path: str = Field(description="Resolvable path, e.g. 'go/foo' or 'go/my/foo' for private links.")
+    url: str | None = Field(description="Destination URL; null for multilinks.")
+    description: str | None = None
+    private: bool
+
+
+class SearchGoLinksOutput(BaseModel):
+    query: str | None = Field(description="The search term used, or null when browsing.")
+    metadata: SearchPaginationMetadata
+    results: list[SearchGoLinkOutput]
+
+
+def _to_output(gl: SearchGoLink) -> SearchGoLinkOutput:
+    return SearchGoLinkOutput(
+        gid=gl.gid,
+        name=gl.name,
+        path=golink_path(gl.name, gl.private),
+        url=gl.url,
+        description=gl.description or None,
+        private=bool(gl.private),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +199,7 @@ async def search_golinks(
         ),
     ] = None,
     ctx: Context | None = None,
-) -> str:
+) -> ToolResult:
     """Search for go links by keyword in the user's GoLinks workspace
     (https://www.golinks.io). Performs a fuzzy/relevance-ranked search
     across go link names, URLs, and descriptions, with optional filters
@@ -226,9 +258,22 @@ async def search_golinks(
     raise_for_status(response, "/search.php")
 
     data = SearchResponse.model_validate(response.json())
+    structured = SearchGoLinksOutput(
+        query=data.search_term or query,
+        metadata=SearchPaginationMetadata(
+            limit=limit,
+            offset=offset,
+            total_results=data.total_links,
+            count=len(data.results),
+        ),
+        results=[_to_output(gl) for gl in data.results],
+    )
 
     if not data.results:
-        return f'No go links found for "{query}".' if query else "No go links found."
+        return ToolResult(
+            content=f'No go links found for "{query}".' if query else "No go links found.",
+            structured_content=structured,
+        )
 
     header = (
         f'Go link search results for "{data.search_term or query}" '
@@ -247,4 +292,4 @@ async def search_golinks(
             entry += f"\n    Desc: {gl.description}"
         lines.append(entry)
 
-    return header + "\n\n".join(lines)
+    return ToolResult(content=header + "\n\n".join(lines), structured_content=structured)
