@@ -113,7 +113,9 @@ class AuditLogListResponse(BaseModel):
 
 class AuditLogEntryOutput(BaseModel):
     alid: int = Field(description="Numeric audit log entry ID.")
-    uid: int | None = Field(description="Numeric ID of the user who performed the action.")
+    uid: int | None = Field(
+        description="Numeric ID of the user who performed the action."
+    )
     email: str | None = Field(description="Email of the user who performed the action.")
     event_type: str = Field(
         description=(
@@ -177,7 +179,9 @@ def _format_entry(entry: AuditLogEntry) -> str:
 async def get_audit_logs(
     general_type: Annotated[
         AuditLogGeneralType | None,
-        Field(description="Filter by general change type: 'Added', 'Changed', or 'Removed'."),
+        Field(
+            description="Filter by general change type: 'Added', 'Changed', or 'Removed'."
+        ),
     ] = None,
     section: Annotated[
         AuditLogSection | None,
@@ -209,10 +213,15 @@ async def get_audit_logs(
     ] = None,
     search: Annotated[
         str | None,
-        Field(description="Free-text search term matched against the log message and event type."),
+        Field(
+            description="Free-text search term matched against the log message and event type."
+        ),
     ] = None,
     limit: Annotated[
-        int, Field(description="Number of audit log entries to return (1–100).", ge=1, le=100)
+        int,
+        Field(
+            description="Number of audit log entries to return (1–100).", ge=1, le=100
+        ),
     ] = 20,
     offset: Annotated[int, Field(description="Pagination offset (0-based).", ge=0)] = 0,
     ctx: Context | None = None,
@@ -272,9 +281,13 @@ async def get_audit_logs(
     )
 
     if not data.results:
-        return ToolResult(content="No audit log entries found.", structured_content=structured)
+        return ToolResult(
+            content="No audit log entries found.", structured_content=structured
+        )
 
     m = data.metadata
     header = f"Audit log entries ({m.count} of {m.total_results} total, offset {m.offset}):\n"
     entries = [f"[{i}]\n{_format_entry(e)}" for i, e in enumerate(data.results, 1)]
-    return ToolResult(content=header + "\n\n".join(entries), structured_content=structured)
+    return ToolResult(
+        content=header + "\n\n".join(entries), structured_content=structured
+    )

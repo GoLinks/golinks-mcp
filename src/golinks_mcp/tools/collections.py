@@ -81,16 +81,22 @@ class CollectionsSearchResponse(BaseModel):
 
 
 class CollectionOutput(BaseModel):
-    collid: int = Field(description="Numeric collection ID; pass as 'collid' to search_golinks.")
+    collid: int = Field(
+        description="Numeric collection ID; pass as 'collid' to search_golinks."
+    )
     name: str
     description: str | None = None
     owner_uid: int = Field(description="Numeric ID of the collection's owner.")
     golinks_count: int = Field(description="Number of go links in the collection.")
-    golinks_app_count: int = Field(description="Number of app go links in the collection.")
+    golinks_app_count: int = Field(
+        description="Number of app go links in the collection."
+    )
     golinks_app_domains: list[str] = []
     pinned: bool
     unlisted: bool
-    favorited: bool = Field(description="Whether the caller has favorited this collection.")
+    favorited: bool = Field(
+        description="Whether the caller has favorited this collection."
+    )
     created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
     updated_at: str | None = Field(description="ISO 8601 UTC timestamp.")
 
@@ -165,7 +171,8 @@ async def search_collections(
         ),
     ] = None,
     limit: Annotated[
-        int, Field(description="Maximum number of results to return (1–100).", ge=1, le=100)
+        int,
+        Field(description="Maximum number of results to return (1–100).", ge=1, le=100),
     ] = 20,
     offset: Annotated[int, Field(description="Pagination offset (0-based).", ge=0)] = 0,
     sort: Annotated[
@@ -182,7 +189,9 @@ async def search_collections(
     ] = None,
     department: Annotated[
         CollectionDepartment | None,
-        Field(description="Restrict results to collections tagged with this department."),
+        Field(
+            description="Restrict results to collections tagged with this department."
+        ),
     ] = None,
     filter: Annotated[
         list[CollectionFilter] | None,
@@ -244,9 +253,15 @@ async def search_collections(
     )
 
     if not data.collections:
-        return ToolResult(content="No collections found.", structured_content=structured)
+        return ToolResult(
+            content="No collections found.", structured_content=structured
+        )
 
     m = data.metadata
     header = f"Collections ({m.count} of {m.total_results} total, offset {m.offset}):\n"
-    entries = [f"[{i}]\n{_format_collection(c)}" for i, c in enumerate(data.collections, 1)]
-    return ToolResult(content=header + "\n\n".join(entries), structured_content=structured)
+    entries = [
+        f"[{i}]\n{_format_collection(c)}" for i, c in enumerate(data.collections, 1)
+    ]
+    return ToolResult(
+        content=header + "\n\n".join(entries), structured_content=structured
+    )

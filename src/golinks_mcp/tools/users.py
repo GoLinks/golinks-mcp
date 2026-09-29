@@ -62,13 +62,19 @@ class UsersListResponse(BaseModel):
 
 
 class UserOutput(BaseModel):
-    uid: int = Field(description="Numeric user ID; pass as 'filter_uid' to get_audit_logs.")
+    uid: int = Field(
+        description="Numeric user ID; pass as 'filter_uid' to get_audit_logs."
+    )
     name: str = Field(description="Display name, falling back to username or email.")
-    username: str | None = Field(description="Exact username; pass as 'username' to search_golinks.")
+    username: str | None = Field(
+        description="Exact username; pass as 'username' to search_golinks."
+    )
     email: str | None = None
     role: str | None = None
     admin: bool
-    active: bool | None = Field(description="Whether the user is active; null if unknown.")
+    active: bool | None = Field(
+        description="Whether the user is active; null if unknown."
+    )
     total_nonprivate_links: int
     created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
 
@@ -130,7 +136,9 @@ def _format_user(u: GoLinksUserResult) -> str:
 async def search_users(
     search: Annotated[
         str | None,
-        Field(description="Search term matched against first name, last name, full name, or email (substring match)."),
+        Field(
+            description="Search term matched against first name, last name, full name, or email (substring match)."
+        ),
     ] = None,
     access_level: Annotated[
         list[UserAccessLevel] | None,
@@ -210,4 +218,6 @@ async def search_users(
     m = data.metadata
     header = f"Users ({m.count} of {m.total_results} total, offset {m.offset}):\n"
     entries = [f"[{i}]\n{_format_user(u)}" for i, u in enumerate(data.results, 1)]
-    return ToolResult(content=header + "\n\n".join(entries), structured_content=structured)
+    return ToolResult(
+        content=header + "\n\n".join(entries), structured_content=structured
+    )

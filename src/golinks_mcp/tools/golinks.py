@@ -83,7 +83,9 @@ class GoLinkOwnerOutput(BaseModel):
 class GoLinkOutput(BaseModel):
     gid: int = Field(description="Numeric go link ID.")
     name: str = Field(description="Go link keyword.")
-    path: str = Field(description="Resolvable path, e.g. 'go/foo' or 'go/my/foo' for private links.")
+    path: str = Field(
+        description="Resolvable path, e.g. 'go/foo' or 'go/my/foo' for private links."
+    )
     url: str | None = Field(description="Destination URL; null for multilinks.")
     description: str | None = None
     owner: GoLinkOwnerOutput
@@ -224,7 +226,9 @@ async def list_golinks(
     except httpx.ConnectError:
         raise ConnectionError("Failed to connect to GoLinks API.")
 
-    raise_for_status(response, "/golinks", not_found_message="The go link does not exist.")
+    raise_for_status(
+        response, "/golinks", not_found_message="The go link does not exist."
+    )
 
     data = GoLinksListResponse.model_validate(response.json())
     structured = GoLinksListOutput(
@@ -238,7 +242,9 @@ async def list_golinks(
     m = data.metadata
     header = f"Go links ({m.count} of {m.total_results} total, offset {m.offset}):\n"
     entries = [f"[{i}]\n{_format_golink(gl)}" for i, gl in enumerate(data.results, 1)]
-    return ToolResult(content=header + "\n\n".join(entries), structured_content=structured)
+    return ToolResult(
+        content=header + "\n\n".join(entries), structured_content=structured
+    )
 
 
 async def get_golink(
@@ -287,7 +293,9 @@ async def get_golink(
     except httpx.ConnectError:
         raise ConnectionError("Failed to connect to GoLinks API.")
 
-    raise_for_status(response, "/golinks", not_found_message="The go link does not exist.")
+    raise_for_status(
+        response, "/golinks", not_found_message="The go link does not exist."
+    )
 
     # Single-lookup always returns a dict on success
     raw = response.json()

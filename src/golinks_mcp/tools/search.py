@@ -58,7 +58,9 @@ SearchSort = Literal[
 ]
 
 
-SearchModified = Literal["today", "last_7_days", "last_30_days", "last_90_days", "last_year"]
+SearchModified = Literal[
+    "today", "last_7_days", "last_30_days", "last_90_days", "last_year"
+]
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -124,23 +126,31 @@ class SearchResponse(BaseModel):
 
 
 class SearchGoLinkOutput(BaseModel):
-    gid: int = Field(description="Numeric go link ID; pass to get_golink for full details.")
+    gid: int = Field(
+        description="Numeric go link ID; pass to get_golink for full details."
+    )
     name: str = Field(description="Go link keyword.")
-    path: str = Field(description="Resolvable path, e.g. 'go/foo' or 'go/my/foo' for private links.")
+    path: str = Field(
+        description="Resolvable path, e.g. 'go/foo' or 'go/my/foo' for private links."
+    )
     url: str | None = Field(description="Destination URL; null for multilinks.")
     description: str | None = None
     owner: GoLinkOwnerOutput
     private: bool
     unlisted: bool
     variable_link: bool
-    pinned: bool = Field(description="Pinned links are always listed first, regardless of sort.")
+    pinned: bool = Field(
+        description="Pinned links are always listed first, regardless of sort."
+    )
     redirect_hits: RedirectHits
     created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
     updated_at: str | None = Field(description="ISO 8601 UTC timestamp.")
 
 
 class SearchGoLinksOutput(BaseModel):
-    query: str | None = Field(description="The search term used, or null when browsing.")
+    query: str | None = Field(
+        description="The search term used, or null when browsing."
+    )
     metadata: SearchPaginationMetadata
     results: list[SearchGoLinkOutput]
 
@@ -282,7 +292,9 @@ async def search_golinks(
     if ctx is None:
         raise PermissionError("Missing request context.")
     if filter and "user_links" in filter and not username:
-        raise ValueError("'username' is required when 'user_links' is included in filter.")
+        raise ValueError(
+            "'username' is required when 'user_links' is included in filter."
+        )
     authorization = get_authorization_header(ctx)
 
     params: dict = {
@@ -336,7 +348,9 @@ async def search_golinks(
 
     if not data.results:
         return ToolResult(
-            content=f'No go links found for "{query}".' if query else "No go links found.",
+            content=f'No go links found for "{query}".'
+            if query
+            else "No go links found.",
             structured_content=structured,
         )
 
@@ -362,4 +376,6 @@ async def search_golinks(
         entry += f"\n    Updated: {format_timestamp(gl.updated_at)}"
         lines.append(entry)
 
-    return ToolResult(content=header + "\n\n".join(lines), structured_content=structured)
+    return ToolResult(
+        content=header + "\n\n".join(lines), structured_content=structured
+    )
