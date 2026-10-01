@@ -2,6 +2,7 @@ from typing import Annotated
 
 import httpx
 from fastmcp import Context
+from fastmcp.tools import ToolResult
 from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
@@ -10,6 +11,7 @@ from golinks_mcp.client import (
     get_authorization_header,
     golink_path,
     http_client,
+    iso_timestamp,
     raise_for_status,
 )
 
@@ -68,19 +70,78 @@ class GoLinksListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Formatting helpers
+# Tool output models
 # ---------------------------------------------------------------------------
 
 
-def _format_golink(gl: GoLink) -> str:
-    owner = gl.user
-    owner_str = (
+class GoLinkOwnerOutput(BaseModel):
+    uid: int
+    name: str = Field(description="Display name, falling back to username or email.")
+    email: str | None = None
+
+
+class GoLinkOutput(BaseModel):
+    gid: int = Field(description="Numeric go link ID.")
+    name: str = Field(description="Go link keyword.")
+    path: str = Field(
+        description="Resolvable path, e.g. 'go/foo' or 'go/my/foo' for private links."
+    )
+    url: str | None = Field(description="Destination URL; null for multilinks.")
+    description: str | None = None
+    owner: GoLinkOwnerOutput
+    tags: list[str] = []
+    private: bool
+    unlisted: bool
+    variable_link: bool
+    pinned: bool
+    redirect_hits: RedirectHits | None = None
+    created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
+    updated_at: str | None = Field(description="ISO 8601 UTC timestamp.")
+
+
+class GoLinksListOutput(BaseModel):
+    metadata: PaginationMetadata
+    results: list[GoLinkOutput]
+
+
+def owner_name(owner: GoLinkUser) -> str:
+    return (
         f"{owner.first_name} {owner.last_name}".strip()
         or owner.username
         or owner.email
         or "Unknown"
     )
 
+
+def _to_output(gl: GoLink) -> GoLinkOutput:
+    return GoLinkOutput(
+        gid=gl.gid,
+        name=gl.name,
+        path=golink_path(gl.name, gl.private),
+        url=gl.url,
+        description=gl.description or None,
+        owner=GoLinkOwnerOutput(
+            uid=gl.user.uid,
+            name=owner_name(gl.user),
+            email=gl.user.email or None,
+        ),
+        tags=[t.name for t in gl.tags],
+        private=bool(gl.private),
+        unlisted=bool(gl.unlisted),
+        variable_link=bool(gl.variable_link),
+        pinned=bool(gl.pinned),
+        redirect_hits=gl.redirect_hits,
+        created_at=iso_timestamp(gl.created_at),
+        updated_at=iso_timestamp(gl.updated_at),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Formatting helpers
+# ---------------------------------------------------------------------------
+
+
+def _format_golink(gl: GoLink) -> str:
     lines = [
         f"GID:     {gl.gid}",
         f"Name:    {golink_path(gl.name, gl.private)}",
@@ -88,7 +149,7 @@ def _format_golink(gl: GoLink) -> str:
     ]
     if gl.description:
         lines.append(f"Desc:    {gl.description}")
-    lines.append(f"Owner:   {owner_str}")
+    lines.append(f"Owner:   {owner_name(gl.user)}")
     if gl.tags:
         lines.append(f"Tags:    {', '.join(t.name for t in gl.tags)}")
 
@@ -122,8 +183,13 @@ def _format_golink(gl: GoLink) -> str:
 
 async def list_golinks(
     limit: Annotated[
-        int, Field(description="Number of go links to return (1–1000).", ge=1, le=1000)
-    ] = 50,
+        int,
+        Field(
+            description="Number of go links to return (1–100). Use 'offset' to page through more.",
+            ge=1,
+            le=100,
+        ),
+    ] = 20,
     offset: Annotated[int, Field(description="Pagination offset (0-based).", ge=0)] = 0,
     sort: Annotated[
         str | None,
@@ -132,12 +198,17 @@ async def list_golinks(
         ),
     ] = None,
     ctx: Context | None = None,
-) -> str:
+) -> ToolResult:
     """List go links in the user's GoLinks workspace (https://www.golinks.io).
 
     Returns a paginated list of company go links the token has access to.
     External OAuth tokens do not include private or unlisted links unless
     specifically granted. Use search_golinks for keyword-based lookup.
+
+    Date sorts ('created_at'/'updated_at') return links in strict date
+    order. Without a sort, pinned go links are listed first. For "most
+    recent" questions, confirm using each link's 'updated_at'/'created_at'.
+
     Read-only.
     """
     if ctx is None:
@@ -147,6 +218,7 @@ async def list_golinks(
     params: dict = {"limit": limit, "offset": offset}
     if sort in ("created_at", "updated_at"):
         params["sort"] = sort
+        params["pinned-first"] = "false"
     params = external_params(params, tool="list_golinks")
 
     try:
@@ -160,17 +232,25 @@ async def list_golinks(
     except httpx.ConnectError:
         raise ConnectionError("Failed to connect to GoLinks API.")
 
-    raise_for_status(response, "/golinks", not_found_message="The go link does not exist.")
+    raise_for_status(
+        response, "/golinks", not_found_message="The go link does not exist."
+    )
 
     data = GoLinksListResponse.model_validate(response.json())
+    structured = GoLinksListOutput(
+        metadata=data.metadata,
+        results=[_to_output(gl) for gl in data.results],
+    )
 
     if not data.results:
-        return "No go links found."
+        return ToolResult(content="No go links found.", structured_content=structured)
 
     m = data.metadata
     header = f"Go links ({m.count} of {m.total_results} total, offset {m.offset}):\n"
     entries = [f"[{i}]\n{_format_golink(gl)}" for i, gl in enumerate(data.results, 1)]
-    return header + "\n\n".join(entries)
+    return ToolResult(
+        content=header + "\n\n".join(entries), structured_content=structured
+    )
 
 
 async def get_golink(
@@ -181,7 +261,7 @@ async def get_golink(
         int | None, Field(description="The numeric go link ID.", ge=1)
     ] = None,
     ctx: Context | None = None,
-) -> str:
+) -> ToolResult:
     """Get details for a single go link by name (keyword) or numeric ID.
 
     Exactly one of 'name' or 'gid' must be provided. Returns full details
@@ -219,7 +299,9 @@ async def get_golink(
     except httpx.ConnectError:
         raise ConnectionError("Failed to connect to GoLinks API.")
 
-    raise_for_status(response, "/golinks", not_found_message="The go link does not exist.")
+    raise_for_status(
+        response, "/golinks", not_found_message="The go link does not exist."
+    )
 
     # Single-lookup always returns a dict on success
     raw = response.json()
@@ -227,7 +309,7 @@ async def get_golink(
         raise LookupError("The go link does not exist.")
 
     gl = GoLink.model_validate(raw)
-    return _format_golink(gl)
+    return ToolResult(content=_format_golink(gl), structured_content=_to_output(gl))
 
 
 async def create_golink(
@@ -282,7 +364,7 @@ async def create_golink(
         Field(description="Alternate names for this go link (max 10)."),
     ] = None,
     ctx: Context | None = None,
-) -> str:
+) -> ToolResult:
     """Create a new, standard go link in the user's GoLinks workspace (https://www.golinks.io).
 
     Both 'name' and 'url' are required. The API enforces name uniqueness,
@@ -342,4 +424,7 @@ async def create_golink(
         raise RuntimeError("Unexpected response from GoLinks create API.")
 
     gl = GoLink.model_validate(raw)
-    return f"Go link created successfully.\n\n{_format_golink(gl)}"
+    return ToolResult(
+        content=f"Go link created successfully.\n\n{_format_golink(gl)}",
+        structured_content=_to_output(gl),
+    )

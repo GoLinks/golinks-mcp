@@ -8,11 +8,17 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.types import ASGIApp
 
-from golinks_mcp.tools.audit_log import get_audit_logs
-from golinks_mcp.tools.collections import search_collections
-from golinks_mcp.tools.golinks import create_golink, get_golink, list_golinks
-from golinks_mcp.tools.search import search_golinks
-from golinks_mcp.tools.users import search_users
+from golinks_mcp.tools.audit_log import AuditLogListOutput, get_audit_logs
+from golinks_mcp.tools.collections import CollectionsListOutput, search_collections
+from golinks_mcp.tools.golinks import (
+    GoLinkOutput,
+    GoLinksListOutput,
+    create_golink,
+    get_golink,
+    list_golinks,
+)
+from golinks_mcp.tools.search import SearchGoLinksOutput, search_golinks
+from golinks_mcp.tools.users import UsersListOutput, search_users
 
 # OAuth discovery env vars with production defaults
 _ISSUER = os.environ.get("GOLINKS_OAUTH_ISSUER", "https://www.golinks.io")
@@ -39,6 +45,7 @@ mcp.add_tool(
     FunctionTool.from_function(
         list_golinks,
         title="List go links",
+        output_schema=GoLinksListOutput.model_json_schema(),
         annotations=ToolAnnotations(
             title="List go links",
             readOnlyHint=True,
@@ -52,6 +59,7 @@ mcp.add_tool(
     FunctionTool.from_function(
         get_golink,
         title="Get go link",
+        output_schema=GoLinkOutput.model_json_schema(),
         annotations=ToolAnnotations(
             title="Get go link",
             readOnlyHint=True,
@@ -65,6 +73,7 @@ mcp.add_tool(
     FunctionTool.from_function(
         search_golinks,
         title="Search go links",
+        output_schema=SearchGoLinksOutput.model_json_schema(),
         annotations=ToolAnnotations(
             title="Search go links",
             readOnlyHint=True,
@@ -78,6 +87,7 @@ mcp.add_tool(
     FunctionTool.from_function(
         create_golink,
         title="Create go link",
+        output_schema=GoLinkOutput.model_json_schema(),
         annotations=ToolAnnotations(
             title="Create go link",
             readOnlyHint=False,
@@ -91,6 +101,7 @@ mcp.add_tool(
     FunctionTool.from_function(
         get_audit_logs,
         title="Get audit logs",
+        output_schema=AuditLogListOutput.model_json_schema(),
         annotations=ToolAnnotations(
             title="Get audit logs",
             readOnlyHint=True,
@@ -104,6 +115,7 @@ mcp.add_tool(
     FunctionTool.from_function(
         search_collections,
         title="Search collections",
+        output_schema=CollectionsListOutput.model_json_schema(),
         annotations=ToolAnnotations(
             title="Search collections",
             readOnlyHint=True,
@@ -117,6 +129,7 @@ mcp.add_tool(
     FunctionTool.from_function(
         search_users,
         title="Search users",
+        output_schema=UsersListOutput.model_json_schema(),
         annotations=ToolAnnotations(
             title="Search users",
             readOnlyHint=True,

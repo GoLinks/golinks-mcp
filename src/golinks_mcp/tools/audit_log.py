@@ -2,6 +2,7 @@ from typing import Annotated, Literal
 
 import httpx
 from fastmcp import Context
+from fastmcp.tools import ToolResult
 from pydantic import BaseModel, Field
 
 from golinks_mcp.client import (
@@ -9,6 +10,7 @@ from golinks_mcp.client import (
     format_timestamp,
     get_authorization_header,
     http_client,
+    iso_timestamp,
     raise_for_status,
 )
 
@@ -105,6 +107,52 @@ class AuditLogListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Tool output models
+# ---------------------------------------------------------------------------
+
+
+class AuditLogEntryOutput(BaseModel):
+    alid: int = Field(description="Numeric audit log entry ID.")
+    uid: int | None = Field(
+        description="Numeric ID of the user who performed the action."
+    )
+    email: str | None = Field(description="Email of the user who performed the action.")
+    event_type: str = Field(
+        description=(
+            "Display label (e.g. 'Go link created'), not the 'event_type' filter "
+            "value. When chaining, pass the matching filter value instead (e.g. 'GoLinkCreated')."
+        )
+    )
+    general_type: str = Field(description="'Added', 'Changed', or 'Removed'.")
+    section: str = Field(
+        description=(
+            "Display label (e.g. 'Go links'), not the 'section' filter value. When "
+            "chaining, pass the matching filter value instead (e.g. 'Golinks')."
+        )
+    )
+    message: str | None = None
+    created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
+
+
+class AuditLogListOutput(BaseModel):
+    metadata: AuditLogPaginationMetadata
+    results: list[AuditLogEntryOutput]
+
+
+def _to_output(entry: AuditLogEntry) -> AuditLogEntryOutput:
+    return AuditLogEntryOutput(
+        alid=entry.alid,
+        uid=entry.uid,
+        email=entry.email or None,
+        event_type=entry.event_type,
+        general_type=entry.general_type,
+        section=entry.section,
+        message=entry.message or None,
+        created_at=iso_timestamp(entry.created_at),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
 
@@ -131,7 +179,9 @@ def _format_entry(entry: AuditLogEntry) -> str:
 async def get_audit_logs(
     general_type: Annotated[
         AuditLogGeneralType | None,
-        Field(description="Filter by general change type: 'Added', 'Changed', or 'Removed'."),
+        Field(
+            description="Filter by general change type: 'Added', 'Changed', or 'Removed'."
+        ),
     ] = None,
     section: Annotated[
         AuditLogSection | None,
@@ -163,14 +213,19 @@ async def get_audit_logs(
     ] = None,
     search: Annotated[
         str | None,
-        Field(description="Free-text search term matched against the log message and event type."),
+        Field(
+            description="Free-text search term matched against the log message and event type."
+        ),
     ] = None,
     limit: Annotated[
-        int, Field(description="Number of audit log entries to return (1–100).", ge=1, le=100)
+        int,
+        Field(
+            description="Number of audit log entries to return (1–100).", ge=1, le=100
+        ),
     ] = 20,
     offset: Annotated[int, Field(description="Pagination offset (0-based).", ge=0)] = 0,
     ctx: Context | None = None,
-) -> str:
+) -> ToolResult:
     """Get audit log entries for the caller's GoLinks workspace (https://www.golinks.io).
 
     Returns a paginated, filterable history of admin-relevant changes such as
@@ -182,6 +237,9 @@ async def get_audit_logs(
     All filters (general_type, section, event_type, filter_uid, search) are
     optional. Call with no filters to get the most recent entries across the
     whole workspace, most recent first.
+
+    Returned 'event_type' and 'section' values are display labels, not filter values.
+    To filter a follow-up call, use the matching 'event_type'/'section' filter value instead.
 
     Requires admin:read scope.
     """
@@ -217,11 +275,19 @@ async def get_audit_logs(
     raise_for_status(response, "/admin/audit_log")
 
     data = AuditLogListResponse.model_validate(response.json())
+    structured = AuditLogListOutput(
+        metadata=data.metadata,
+        results=[_to_output(e) for e in data.results],
+    )
 
     if not data.results:
-        return "No audit log entries found."
+        return ToolResult(
+            content="No audit log entries found.", structured_content=structured
+        )
 
     m = data.metadata
     header = f"Audit log entries ({m.count} of {m.total_results} total, offset {m.offset}):\n"
     entries = [f"[{i}]\n{_format_entry(e)}" for i, e in enumerate(data.results, 1)]
-    return header + "\n\n".join(entries)
+    return ToolResult(
+        content=header + "\n\n".join(entries), structured_content=structured
+    )
