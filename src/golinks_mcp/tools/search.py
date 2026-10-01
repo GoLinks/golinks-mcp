@@ -140,7 +140,7 @@ class SearchGoLinkOutput(BaseModel):
     unlisted: bool
     variable_link: bool
     pinned: bool = Field(
-        description="Pinned links are always listed first, regardless of sort."
+        description="Pinned links are listed first, except with date or relevance sorts."
     )
     redirect_hits: RedirectHits
     created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
@@ -281,9 +281,10 @@ async def search_golinks(
     instead.
 
     Unlike list_golinks, results include the caller's own private and
-    unlisted links. Pinned go links are always listed first, regardless of
-    'sort'. For "most recent" questions, rank by each link's
-    'updated_at'/'created_at' rather than by result order.
+    unlisted links. Date sorts ('new'/'created_at'/'updated_at') return
+    links in strict date order. Other non-relevance sorts list pinned go
+    links first. For "most recent" questions, confirm using each link's
+    'updated_at'/'created_at'.
 
     Read-only.
 
@@ -305,6 +306,8 @@ async def search_golinks(
     }
     if sort is not None:
         params["sort"] = sort
+    if sort in ("new", "created_at", "updated_at"):
+        params["pinned-first"] = "false"
     if order is not None:
         params["order"] = order
     if filter:

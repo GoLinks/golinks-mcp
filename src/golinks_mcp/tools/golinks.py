@@ -205,9 +205,9 @@ async def list_golinks(
     External OAuth tokens do not include private or unlisted links unless
     specifically granted. Use search_golinks for keyword-based lookup.
 
-    Pinned go links are always listed first, regardless of 'sort'. For
-    "most recent" questions, rank by each link's 'updated_at'/'created_at'
-    rather than by result order.
+    Date sorts ('created_at'/'updated_at') return links in strict date
+    order. Without a sort, pinned go links are listed first. For "most
+    recent" questions, confirm using each link's 'updated_at'/'created_at'.
 
     Read-only.
     """
@@ -218,6 +218,7 @@ async def list_golinks(
     params: dict = {"limit": limit, "offset": offset}
     if sort in ("created_at", "updated_at"):
         params["sort"] = sort
+        params["pinned-first"] = "false"
     params = external_params(params, tool="list_golinks")
 
     try:
