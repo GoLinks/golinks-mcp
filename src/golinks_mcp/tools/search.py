@@ -2,15 +2,25 @@ from typing import Annotated, Literal
 
 import httpx
 from fastmcp import Context
-from pydantic import BaseModel, Field
+from fastmcp.tools import ToolResult
+from pydantic import BaseModel, Field, field_validator
 
 from golinks_mcp.client import (
     SortOrder,
     external_params,
+    format_timestamp,
     get_authorization_header,
     golink_path,
     http_client,
+    iso_timestamp,
+    parse_api_datetime,
     raise_for_status,
+)
+from golinks_mcp.tools.golinks import (
+    GoLinkOwnerOutput,
+    GoLinkUser,
+    RedirectHits,
+    owner_name,
 )
 
 # ---------------------------------------------------------------------------
@@ -48,7 +58,9 @@ SearchSort = Literal[
 ]
 
 
-SearchModified = Literal["today", "last_7_days", "last_30_days", "last_90_days", "last_year"]
+SearchModified = Literal[
+    "today", "last_7_days", "last_30_days", "last_90_days", "last_year"
+]
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -61,6 +73,35 @@ class SearchGoLink(BaseModel):
     url: str | None = None
     description: str | None = None
     private: int = 0
+    unlisted: int = 0
+    variable_link: int = 0
+    pinned: int = 0
+    uid: int = 0
+    firstname: str | None = None
+    lastname: str | None = None
+    username: str | None = None
+    email: str | None = None
+    daily: int = 0
+    weekly: int = 0
+    monthly: int = 0
+    alltime: int = 0
+    created_at: int | None = None
+    updated_at: int | None = None
+
+    # /search.php returns raw backend-local datetimes
+    _parse_datetimes = field_validator("created_at", "updated_at", mode="before")(
+        parse_api_datetime
+    )
+
+    @property
+    def user(self) -> GoLinkUser:
+        return GoLinkUser(
+            uid=self.uid,
+            first_name=self.firstname or "",
+            last_name=self.lastname or "",
+            username=self.username or "",
+            email=self.email or "",
+        )
 
 
 class SearchPaginationMetadata(BaseModel):
@@ -77,6 +118,65 @@ class SearchResponse(BaseModel):
     metadata: SearchPaginationMetadata = SearchPaginationMetadata()
 
     model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Tool output models
+# ---------------------------------------------------------------------------
+
+
+class SearchGoLinkOutput(BaseModel):
+    gid: int = Field(
+        description="Numeric go link ID; pass to get_golink for full details."
+    )
+    name: str = Field(description="Go link keyword.")
+    path: str = Field(
+        description="Resolvable path, e.g. 'go/foo' or 'go/my/foo' for private links."
+    )
+    url: str | None = Field(description="Destination URL; null for multilinks.")
+    description: str | None = None
+    owner: GoLinkOwnerOutput
+    private: bool
+    unlisted: bool
+    variable_link: bool
+    pinned: bool = Field(
+        description="Pinned links are listed first, except with date or relevance sorts."
+    )
+    redirect_hits: RedirectHits
+    created_at: str | None = Field(description="ISO 8601 UTC timestamp.")
+    updated_at: str | None = Field(description="ISO 8601 UTC timestamp.")
+
+
+class SearchGoLinksOutput(BaseModel):
+    query: str | None = Field(
+        description="The search term used, or null when browsing."
+    )
+    metadata: SearchPaginationMetadata
+    results: list[SearchGoLinkOutput]
+
+
+def _to_output(gl: SearchGoLink) -> SearchGoLinkOutput:
+    return SearchGoLinkOutput(
+        gid=gl.gid,
+        name=gl.name,
+        path=golink_path(gl.name, gl.private),
+        url=gl.url,
+        description=gl.description or None,
+        owner=GoLinkOwnerOutput(
+            uid=gl.uid,
+            name=owner_name(gl.user),
+            email=gl.email or None,
+        ),
+        private=bool(gl.private),
+        unlisted=bool(gl.unlisted),
+        variable_link=bool(gl.variable_link),
+        pinned=bool(gl.pinned),
+        redirect_hits=RedirectHits(
+            daily=gl.daily, weekly=gl.weekly, monthly=gl.monthly, alltime=gl.alltime
+        ),
+        created_at=iso_timestamp(gl.created_at),
+        updated_at=iso_timestamp(gl.updated_at),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +267,7 @@ async def search_golinks(
         ),
     ] = None,
     ctx: Context | None = None,
-) -> str:
+) -> ToolResult:
     """Search for go links by keyword in the user's GoLinks workspace
     (https://www.golinks.io). Performs a fuzzy/relevance-ranked search
     across go link names, URLs, and descriptions, with optional filters
@@ -178,14 +278,24 @@ async def search_golinks(
     collection) without keyword matching.
 
     For fetching a specific go link by exact name/ID, use get_golink
-    instead. Read-only.
+    instead.
+
+    Unlike list_golinks, results include the caller's own private and
+    unlisted links. Date sorts ('new'/'created_at'/'updated_at') return
+    links in strict date order. Other non-relevance sorts list pinned go
+    links first. For "most recent" questions, confirm using each link's
+    'updated_at'/'created_at'.
+
+    Read-only.
 
     Requires search:read scope.
     """
     if ctx is None:
         raise PermissionError("Missing request context.")
     if filter and "user_links" in filter and not username:
-        raise ValueError("'username' is required when 'user_links' is included in filter.")
+        raise ValueError(
+            "'username' is required when 'user_links' is included in filter."
+        )
     authorization = get_authorization_header(ctx)
 
     params: dict = {
@@ -196,6 +306,8 @@ async def search_golinks(
     }
     if sort is not None:
         params["sort"] = sort
+    if sort in ("new", "created_at", "updated_at"):
+        params["pinned-first"] = "false"
     if order is not None:
         params["order"] = order
     if filter:
@@ -226,9 +338,24 @@ async def search_golinks(
     raise_for_status(response, "/search.php")
 
     data = SearchResponse.model_validate(response.json())
+    structured = SearchGoLinksOutput(
+        query=data.search_term or query,
+        metadata=SearchPaginationMetadata(
+            limit=limit,
+            offset=offset,
+            total_results=data.total_links,
+            count=len(data.results),
+        ),
+        results=[_to_output(gl) for gl in data.results],
+    )
 
     if not data.results:
-        return f'No go links found for "{query}".' if query else "No go links found."
+        return ToolResult(
+            content=f'No go links found for "{query}".'
+            if query
+            else "No go links found.",
+            structured_content=structured,
+        )
 
     header = (
         f'Go link search results for "{data.search_term or query}" '
@@ -240,11 +367,18 @@ async def search_golinks(
     lines = []
     for i, gl in enumerate(data.results, 1):
         entry = f"[{i}] {golink_path(gl.name, gl.private)}"
-        entry += f"\n    GID:  {gl.gid}"
+        entry += f"\n    GID:     {gl.gid}"
         if gl.url:
-            entry += f"\n    URL:  {gl.url}"
+            entry += f"\n    URL:     {gl.url}"
         if gl.description:
-            entry += f"\n    Desc: {gl.description}"
+            entry += f"\n    Desc:    {gl.description}"
+        entry += f"\n    Owner:   {owner_name(gl.user)}"
+        if gl.pinned:
+            entry += "\n    Pinned:  yes"
+        entry += f"\n    Hits:    {gl.alltime} all-time"
+        entry += f"\n    Updated: {format_timestamp(gl.updated_at)}"
         lines.append(entry)
 
-    return header + "\n\n".join(lines)
+    return ToolResult(
+        content=header + "\n\n".join(lines), structured_content=structured
+    )
