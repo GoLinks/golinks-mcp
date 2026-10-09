@@ -29,9 +29,28 @@
 
 <!-- Local setup: https://github.com/GoLinks/golinks-mcp#local-development -->
 
-- [ ] Make sure you have a basic `.env` set up in the root, pointing at the right GoLinks environment (e.g. `https://dev01.golinks.io/d/<YOUR_BRANCH>`)
+### Set up the server
+
+- [ ] Make sure you have a basic `.env` set up in the root, pointing at the right GoLinks environment (e.g. `https://dev01.golinks.io/d/<YOUR_BRANCH>` or the ngrok URL)
 - [ ] Run `uv sync` and start the server by running: `uv run python -m golinks_mcp`
-- [ ] Connect a client (MCP Inspector, `claude mcp add --transport http golinks-mcp-dev http://localhost:8000/mcp -H "Authorization: Bearer <OAuth Token>"`, or ngrok)
+- [ ] Connect a client! Here are some quick options:
+  - MCP Inspector: Run `npx @modelcontextprotocol/inspector` and connect via Streamable HTTP to `http://localhost:8000/mcp` (with an OAuth token)
+  - Claude: `claude mcp add --transport http golinks-mcp-dev http://localhost:8000/mcp -H "Authorization: Bearer <OAuth Token>"`
+  - Cursor: add this to `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project), then enable `golinks-mcp-dev` under Settings → MCP:
+    ```json
+    {
+      "mcpServers": {
+        "golinks-mcp-dev": {
+          "url": "http://localhost:8000/mcp",
+          "headers": { "Authorization": "Bearer <OAuth Token>" }
+        }
+      }
+    }
+    ```
+  - ngrok, for pretty much any client: set up [ngrok](https://ngrok.com/download), then run `ngrok http 8000`, then use `<ngrok URL>/mcp` to connect
+
+### Test the changes
+
 - [ ] ADDITIONAL_STEPS_HERE
 - [ ] Verify that existing tools still work
 
