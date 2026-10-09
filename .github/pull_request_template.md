@@ -29,7 +29,8 @@
 
 <!-- Local setup: https://github.com/GoLinks/golinks-mcp#local-development -->
 
-### Set up the server
+<details>
+<summary><b>Set up the server</b></summary>
 
 - [ ] Make sure you have a basic `.env` set up in the root, pointing at the right GoLinks environment (e.g. `https://dev01.golinks.io/d/<YOUR_BRANCH>` or the ngrok URL)
 - [ ] Run `uv sync` and start the server by running: `uv run python -m golinks_mcp`
@@ -49,7 +50,7 @@
     ```
   - ngrok, for pretty much any client: set up [ngrok](https://ngrok.com/download), then run `ngrok http 8000`, then use `<ngrok URL>/mcp` to connect
 
-### Test the changes
+</details>
 
 - [ ] ADDITIONAL_STEPS_HERE
 - [ ] Verify that existing tools still work
